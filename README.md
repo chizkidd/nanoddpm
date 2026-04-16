@@ -1,6 +1,6 @@
 # nanoddpm
 
-From-scratch Denoising Diffusion Probabilistic Model (DDPM) for MNIST in ~250 lines. Educational, heavily commented, and designed to mirror the `micrograd`/`minbpe` 
+From-scratch Denoising Diffusion Probabilistic Model (DDPM) for MNIST in ~200 lines. Educational and designed to mirror other minimal implemenations like `microgpt`.
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/chizkidd/nanoddpm/blob/main/nanoddpm.ipynb)
 
