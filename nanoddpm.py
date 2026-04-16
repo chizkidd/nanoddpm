@@ -36,7 +36,7 @@ def forward_diffusion(x0, t):
 transform = T.Compose([T.ToTensor(), T.Normalize([0.5], [0.5])])
 dataset = torchvision.datasets.MNIST(root="./data", train=True, download=True, transform=transform)
 loader = torch.utils.data.DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=2, pin_memory=True)
-real_batch = next(iter(torch.utils.data.DataLoader(dataset, batch_size=256, shuffle=False))).to(device)
+real_batch = next(iter(torch.utils.data.DataLoader(dataset, batch_size=256, shuffle=False)))[0].to(device)
 
 # === 3. MODEL (Sinusoidal Time Embedding + Time-Conditioned CNN) ===
 def sinusoidal_embedding(t, dim, max_period=10000):
