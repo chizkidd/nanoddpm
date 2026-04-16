@@ -134,10 +134,17 @@ for epoch in trange(1, args.epochs+1, desc="Training"):
     metrics_log.append(m)
     print(f"  Epoch {epoch:02d} | Loss: {m['loss']:.4f} | FID≈{m['fid']:.1f} | Var: {m['var']:.3f} | Grad: {m['grad']:.3f} | KL: {m['kl']:.4f}")
 
-with open('nanoddpm_metrics.json', 'w') as f: 
-    json.dump(metrics_log, f, indent=2)
 
-# === 6. VISUALIZATION ===
+# === 6. JSON DUMP: Create a serializable version of metrics_log for JSON dumping ===
+json_output_metrics = []
+for metric_entry in metrics_log:
+    serializable_entry = {k: v for k, v in metric_entry.items() if k != 'samples'}
+    json_output_metrics.append(serializable_entry)
+
+with open('nanoddpm_metrics.json', 'w') as f: 
+    json.dump(json_output_metrics, f, indent=2)
+
+# === 7. VISUALIZATION ===
 def plot_results():
     fig, axs = plt.subplots(1, 3, figsize=(12, 3))
     axs[0].plot([m['epoch'] for m in metrics_log], [m['loss'] for m in metrics_log], marker='o')
@@ -155,7 +162,7 @@ def plot_results():
     print("\nFinal samples:")
     final_grid = torchvision.utils.make_grid(metrics_log[-1]['samples'][:16], nrow=4, normalize=True, value_range=(-1,1))
     plt.figure(figsize=(4,4))
-    plt.imshow(final_grid.permute(1,2,0).numpy())
+    plt.imshow(final_grid.cpu().permute(1,2,0).numpy())
     plt.axis('off')
     plt.show()
 
