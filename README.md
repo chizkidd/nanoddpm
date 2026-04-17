@@ -8,7 +8,7 @@ From-scratch Denoising Diffusion Probabilistic Model (DDPM) for MNIST in <200 li
 - Single-file implementation (`nanoddpm.py`)
 - Sinusoidal time embeddings + time-conditioned CNN
 - Forward/reverse process with explicit math comments
-- Lightweight quality metrics (no InceptionV3 required)
+- Lightweight quality metrics (no `InceptionV3` required)
 - CLI args for epochs, batch size, diffusion steps, and device
 
 ## Quick Start
