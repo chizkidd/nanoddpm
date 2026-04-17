@@ -1,8 +1,11 @@
+[![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/)
+[![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-red.svg)](https://pytorch.org/)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/chizkidd/nanoddpm/blob/main/nanoddpm.ipynb)
+
 # nanoddpm
 
 From-scratch Denoising Diffusion Probabilistic Model (DDPM) for MNIST in <200 lines. Educational and inspired by other minimal implemenations like Andrej Karpathy's `microgpt`.
-
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/chizkidd/nanoddpm/blob/main/nanoddpm.ipynb)
 
 ## Features
 - Single-file implementation (`nanoddpm.py`)
