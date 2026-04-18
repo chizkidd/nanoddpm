@@ -27,8 +27,8 @@ nanoddpm/
 ```
 
 ## Philosophy
-- _The readability of the code should translate to learnable mathematics._
-- _No black boxes. No heavy wrappers. Just raw PyTorch and explicit diffusion equations that fit in a single file._
+- The readability of the code should translate to learnable mathematics.
+- No black boxes. No heavy wrappers. Just raw PyTorch and explicit diffusion equations that fit in a single file.
 
 ## License
 MIT
