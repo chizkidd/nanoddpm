@@ -23,7 +23,7 @@ python nanoddpm.py --epochs 5 --steps 500 --batch_size 128
 
 ## Philosophy
 - _The readability of the code should translate to learnable mathematics._
-- _No black boxes. No heavy wrappers. Just raw PyTorch, and explicit diffusion equations that fits in a single file. Designed for learners who want to understand **how** diffusion works, not just how to call it._
+- _No black boxes. No heavy wrappers. Just raw PyTorch, and explicit diffusion equations that fits in a single file._
 
 
 ## License
