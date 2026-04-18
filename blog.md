@@ -1,6 +1,6 @@
-# nanoddpm: Diffusion Models from Scratch in <200 Lines
+# nanoddpm: Diffusion Models from Scratch in <180 Lines
 
-> Inspired by `micrograd`, `minbpe`, and `microGPT`. No black boxes, no high-level wrappers. Just the math, the code, and the gradients.
+> Inspired by Karpathy's `microgpt`. No black boxes, no high-level wrappers. Just the math, the code, and the gradients.
 
 ## The Core Idea
 Diffusion models generate data by reversing a gradual noising process. Instead of learning to generate pixels directly, we train a network to **predict the noise** added at each step. Once trained, we start from pure noise and iteratively denoise it to produce realistic samples.
@@ -10,7 +10,7 @@ This post walks through the three pillars of DDPMs:
 2. The reverse denoising process (math + code)
 3. The simplified loss function (derivation + intuition)
 
-Plus, we'll track generation quality with lightweight, from-scratch metrics.
+Plus, we track generation quality with lightweight, from-scratch metrics.
 
 ---
 
@@ -51,6 +51,8 @@ Where $\epsilon_\theta$ is our neural network predicting the noise, and $\sigma_
 
 **In code:**
 ```python
+# Precomputed from schedule: sqrt_a = torch.sqrt(alpha[t]), b = beta[t],
+# sqrt_1m_ab = torch.sqrt(1 - alpha_bar[t]), sqrt_b = torch.sqrt(beta[t])
 for t in reversed(range(T_steps)):
     eps_pred = model(x, t)
     x = (1/sqrt_a)*(x - (b/sqrt_1m_ab)*eps_pred)
@@ -76,7 +78,7 @@ eps_pred = model(xt, t)
 loss = nn.functional.mse_loss(eps_pred, eps)
 ```
 
-That's it. One line of MSE. The entire generative capability emerges from this simple signal.
+That is it. One line of MSE. The entire generative capability emerges from this simple signal.
 
 ---
 
@@ -85,12 +87,24 @@ Real FID requires heavy feature extractors. For educational builds, we track fou
 
 | Metric | Formula/Method | What it tells us |
 |--------|----------------|------------------|
-| **Approx-FID** | $\|\mu_r-\mu_g\|^2 + \text{Tr}(\Sigma_r + \Sigma_g - 2\sqrt{\Sigma_r\Sigma_g})$ | Distributional alignment (pixel-level) |
+| **Pixel-FID** | $\|\mu_r-\mu_g\|^2 + \text{Tr}(\Sigma_r + \Sigma_g - 2\sqrt{\Sigma_r\Sigma_g})$ | Distributional alignment (pixel-level proxy; true FID uses Inception features) |
 | **Sample Variance** | $\text{std}(x_{gen})$ | Detects mode collapse (low = boring) |
-| **Sobel Gradient** | $\sqrt{(\nabla_x I)^2 + (\nabla_y I)^2}$ | Sharpness & edge definition |
+| **Sobel Gradient** | $\sqrt{(\nabla_x I)^2 + (\nabla_y I)^2}$ | Sharpness and edge definition; low magnitude correlates with blurry samples |
 | **Intensity KL** | $D_{KL}(P_{gen} \| P_{real})$ | Pixel histogram matching |
 
 All run in <50 lines of pure PyTorch/NumPy. No external models.
+
+---
+
+## 5. Architecture: Minimal Time-Conditioned CNN
+The model is a sequential convolutional network that injects timestep information directly into the feature maps:
+
+- **Input:** $x_t \in \mathbb{R}^{1 \times 28 \times 28}$ (MNIST)
+- **Time embedding:** $\text{sinusoidal}(t) \in \mathbb{R}^{128}$, projected to channel dimension and broadcast spatially via `[:, :, None, None]`
+- **2 conditional blocks** (`TimeBlock`): Each applies Conv2d, GroupNorm, adds the projected time embedding, and passes through SiLU
+- **Output:** $\epsilon_\theta(x_t, t) \in \mathbb{R}^{1 \times 28 \times 28}$ via a final 3×3 convolution
+
+Unlike U-Nets or ResNets, this architecture contains no skip connections, downsampling, or attention. It relies purely on the diffusion loss to learn hierarchical denoising. The entire network definition fits in ~40 lines, with the full training script under 180 lines.
 
 ---
 
