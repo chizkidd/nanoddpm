@@ -1,3 +1,12 @@
+[![CI](https://github.com/chizkidd/nanoddpm/actions/workflows/ci.yml/badge.svg)](https://github.com/chizkidd/nanoddpm/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/)
+[![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-red.svg)](https://pytorch.org/)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+![visitor badge](https://visitor-badge.laobi.icu/badge?page_id=chizkidd.nanoddpm)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/chizkidd/nanoddpm/blob/main/nanoddpm.ipynb)
+
+
+
 # nanoddpm
 
 From-scratch implementation of Denoising Diffusion Probabilistic Model (DDPM) on MNIST dataset in <180 lines. Educational and inspired by other minimal implementations like Andrej Karpathy's `microgpt`.
