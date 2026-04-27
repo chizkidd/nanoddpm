@@ -113,9 +113,9 @@ These are not true FID metrics, but they are useful for debugging and iteration.
 
 ---
 
-## 5. Architecture
+## 5. Model Architecture
 
-### 5.1. Minimal Time-Conditioned CNN
+### 5.1. Minimal Time-Conditioned CNN Model
 The model is a sequential convolutional network that injects timestep information directly into the feature maps:
 
 - **Input:** $x_t \in \mathbb{R}^{1 \times 28 \times 28}$ (MNIST)
