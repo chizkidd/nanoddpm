@@ -12,11 +12,23 @@
 From-scratch implementation of Denoising Diffusion Probabilistic Model (DDPM) on MNIST dataset in 200 lines. Educational and inspired by other minimal implementations like Andrej Karpathy's `microgpt`.
 
 ## Features
-- Single-file implementation (`nanoddpm.py`)
-- Sinusoidal time embeddings + time-conditioned CNN
-- Forward/reverse process with explicit math comments
-- Lightweight quality metrics (no InceptionV3 required)
-- CLI args for epochs, batch size, diffusion steps, and device
+- Single-file PyTorch implementation (`nanoddpm.py`)
+- Classic DDPM baseline with sinusoidal time embeddings
+- Lightweight evaluation metrics (FID approximation, Sobel sharpness, histogram KL)
+- Fully explicit forward and reverse diffusion equations
+- CLI control for training and sampling
+
+## Current Model Evolution
+This repository now explores three stages of diffusion modeling:
+
+- **DDPM baseline**
+  - Discrete timestep conditioning
+  - ε-prediction objective
+
+- **Improved DDPM variants**
+  - SNR-weighted losses
+  - EMA stabilization
+  - Better U-Net-style skip structure
 
 ## Quick Start
 ```bash
@@ -27,11 +39,12 @@ python nanoddpm.py --epochs 5 --steps 500 --batch_size 128
 ## Project Structure
 ```
 nanoddpm/
-├── .github/workflows/ci.yml  # CI: smoke test on CPU
-├── nanoddpm.py               # Single-file implementation (<180 lines)
-├── nanoddpm.ipynb            # Colab notebook with visualization
+├── .github/workflows/ci.yml  # CI: CPU smoke test
+├── archive/                  # Legacy v1 implementations (preserved for reference)
+│   ├── nanoddpm-v1.ipynb
+├── nanoddpm.py               # Single-file diffusion implementation 
 ├── requirements.txt          # torch, torchvision, numpy, matplotlib, tqdm
-├── blog.md                   # Math walkthrough (forward, reverse, loss, metrics)
+├── blog.md                   # Mathematical walkthrough (forward, reverse, loss, metrics)
 └── README.md
 ```
 
