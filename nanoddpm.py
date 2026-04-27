@@ -142,7 +142,7 @@ def evaluate(model, n=256, steps=250):
     model.eval()
     with torch.no_grad():
         x = torch.randn(n, 1, 28, 28, device=device)                                   
-        t_seq = torch.linspace(0, T_STEPS - 1, steps, device=device)
+        t_seq = torch.linspace(0, T_steps - 1, steps, device=device)
         t_seq = torch.flip(t_seq, dims=[0]).long()
         t_seq = torch.unique_consecutive(t_seq)              
         for i in range(len(t_seq) - 1):
