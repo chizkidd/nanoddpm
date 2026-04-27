@@ -4,7 +4,7 @@
 
 import argparse, torch, torch.nn as nn, torch.optim as optim
 import torchvision, torchvision.transforms as T
-import matplotlib.pyplot as plt, numpy as np, math, json
+import matplotlib.pyplot as plt, numpy as np, math, json, copy
 from tqdm import tqdm, trange
 import torch.nn.functional as F
 
@@ -14,22 +14,32 @@ parser.add_argument('--epochs', type=int, default=50)
 parser.add_argument('--batch_size', type=int, default=128)
 parser.add_argument('--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu')
 parser.add_argument('--steps', type=int, default=1000) 
+parser.add_argument('--learning_rate', type=float, default=5e-4)
 args = parser.parse_args()
 device = torch.device(args.device)
 torch.manual_seed(42)
 print(f"▶ nanoddpm | Device: {device} | Steps: {args.steps} | Epochs: {args.epochs}")
 
 # === 1. NOISE SCHEDULE & FORWARD PROCESS ===
+def cosine_beta_schedule(T, s=0.008):
+    steps = T + 1
+    x = torch.linspace(0, T, steps, device=device)
+    alphas_bar = torch.cos(((x / T) + s) / (1 + s) * math.pi * 0.5) ** 2
+    alphas_bar = alphas_bar / alphas_bar[0]
+    beta = 1 - (alphas_bar[1:] / alphas_bar[:-1])
+    return torch.clamp(beta, 1e-5, 0.999)
+
 T_steps = args.steps
-beta = torch.linspace(1e-4, 0.02, T_steps, device=device)
+beta = cosine_beta_schedule(T_steps)
 alpha = 1.0 - beta
 alpha_bar = torch.cumprod(alpha, dim=0)
+sqrt_alpha_bar, sqrt_one_minus_alpha_bar = torch.sqrt(alpha_bar), torch.sqrt(1 - alpha_bar)
 
 def forward_diffusion(x0, t):
     """q(x_t | x_0) = sqrt(ᾱ_t)·x_0 + sqrt(1-ᾱ_t)·ε"""
-    sqrt_ab = torch.sqrt(alpha_bar[t])[:, None, None, None]
-    sqrt_1m = torch.sqrt(1.0 - alpha_bar[t])[:, None, None, None]
-    eps = torch.randn_like(x0, device=device)
+    sqrt_ab = sqrt_alpha_bar[t][:, None, None, None]
+    sqrt_1m = sqrt_one_minus_alpha_bar[t][:, None, None, None]
+    eps = torch.randn_like(x0)
     return sqrt_ab * x0 + sqrt_1m * eps, eps
 
 # === 2. DATASET (MNIST → [-1, 1]) ===
@@ -60,15 +70,20 @@ class NanoDDPM(nn.Module):
     def __init__(self, time_dim=128):
         super().__init__()
         self.time_dim = time_dim
-        self.b1 = TimeBlock(1, 16, time_dim)
-        self.b2 = TimeBlock(16, 32, time_dim)
+        self.b1 = TimeBlock(1, 32, time_dim)
+        self.b2 = TimeBlock(32, 64, time_dim)
+        self.b3 = TimeBlock(64, 32, time_dim)
         self.out = nn.Conv2d(32, 1, 3, padding=1)
+        self.time_mlp = nn.Sequential(nn.Linear(time_dim, time_dim), nn.SiLU(), nn.Linear(time_dim, time_dim))
     def forward(self, x, t):
-        t_emb = sinusoidal_embedding(t, self.time_dim)
-        return self.out(self.b2(self.b1(x, t_emb), t_emb))
+        t_emb = self.time_mlp(sinusoidal_embedding(t, self.time_dim))
+        h1 = self.b1(x, t_emb)
+        h2 = self.b2(h1, t_emb)
+        h3 = self.b3(h2, t_emb)
+        return self.out(h3 + h1) 
 
 model = NanoDDPM(time_dim=128).to(device)
-optimizer = optim.Adam(model.parameters(), lr=2e-3)
+optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
 print(f"▶ Params: {sum(p.numel() for p in model.parameters()):,}")
 
 # === 4. METRICS (From-scratch, pedagogical) ===
@@ -88,31 +103,40 @@ def intensity_kl(real, gen, bins=50):
     hr, _ = np.histogram(r, bins=bins, range=(-1,1), density=True)
     hg, _ = np.histogram(g, bins=bins, range=(-1,1), density=True)
     hr, hg = hr+1e-8, hg+1e-8
-    hr/=hr.sum()
-    hg/=hg.sum()
+    hr /= hr.sum()
+    hg /= hg.sum()
     return np.sum(hg * np.log(hg/hr)).item()
 
-def evaluate(model):
+def evaluate(model, n=256, steps=250):
     model.eval()
     with torch.no_grad():
-        x = torch.randn(256, 1, 28, 28, device=device)
-        for t in reversed(range(T_steps)):
-            t_t = torch.full((256,), t, device=device)
-            eps_p = model(x, t_t)
-            a, ab, b = alpha[t], alpha_bar[t], beta[t]
-            x = (1/torch.sqrt(a))*(x - (b/torch.sqrt(1-ab))*eps_p)
-            if t>0: 
-                x += torch.sqrt(b)*torch.randn_like(x)
-            x = torch.clip(x, -1.0, 1.0)
+        x = torch.randn(n, 1, 28, 28, device=device)                                  
+        t_seq = torch.linspace(T_steps - 1, 0, steps, device=device)
+        t_seq = torch.round(t_seq).long()                
+        for i in range(len(t_seq) - 1):
+            t = t_seq[i]
+            t_next = t_seq[i + 1]
+            t_batch = torch.full((n,), t, device=device, dtype=torch.long)
+            eps = model(x, t_batch)
+            ab, ab_next = alpha_bar[t], alpha_bar[t_next]
+            x0 = (x - sqrt_one_minus_alpha_bar[t] * eps) / sqrt_alpha_bar[t]
+            x = sqrt_alpha_bar[t_next] * x0 + sqrt_one_minus_alpha_bar[t_next] * eps
+        x = torch.clamp(x, -1.0, 1.0)
         return {
-            'fid': approx_fid(real_batch[:256], x),
+            'fid': approx_fid(real_batch[:n], x),
             'var': x.std().item(),
             'grad': sobel_grad(x),
-            'kl': intensity_kl(real_batch[:256], x),
+            'kl': intensity_kl(real_batch[:n], x),
             'samples': x
         }
 
+def update_ema(model, ema_model, ema_decay=0.995):
+    with torch.no_grad():
+        for p, ema_p in zip(model.parameters(), ema_model.parameters()):
+            ema_p.mul_(ema_decay).add_(p, alpha=1 - ema_decay)
+
 # === 5. TRAINING LOOP ===
+ema_model = copy.deepcopy(model)
 metrics_log = []
 for epoch in trange(1, args.epochs+1, desc="Training"):
     model.train()
@@ -122,13 +146,17 @@ for epoch in trange(1, args.epochs+1, desc="Training"):
         t = torch.randint(0, T_steps, (imgs.shape[0],), device=device)
         xt, eps = forward_diffusion(imgs, t)
         optimizer.zero_grad()
-        loss = nn.functional.mse_loss(model(xt, t), eps)
+        # loss = nn.functional.mse_loss(model(xt, t), eps)
+        loss = ((model(xt, t) - eps) ** 2).mean(dim=(1,2,3))
+        loss = (loss * (1 - alpha_bar[t])).mean()
         loss.backward()
+        torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
         optimizer.step()
+        update_ema(model, ema_model)
         epoch_loss += loss.item()*imgs.shape[0]
         count += imgs.shape[0]
     
-    m = evaluate(model)
+    m = evaluate(ema_model)
     m['epoch'] = epoch
     m['loss'] = epoch_loss/count
     metrics_log.append(m)
