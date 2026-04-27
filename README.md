@@ -9,7 +9,7 @@
 
 # nanoddpm
 
-From-scratch implementation of Denoising Diffusion Probabilistic Model (DDPM) on MNIST dataset in 200 lines. Educational and inspired by other minimal implementations like Andrej Karpathy's `microgpt`.
+From-scratch implementation of Denoising Diffusion Probabilistic Model (DDPM) on MNIST dataset in <250 lines. Educational and inspired by other minimal implementations like Andrej Karpathy's `microgpt`.
 
 ## Features
 - Single-file PyTorch implementation (`nanoddpm.py`)
@@ -33,7 +33,7 @@ This repository now explores three stages of diffusion modeling:
 ## Quick Start
 ```bash
 pip install -r requirements.txt
-python nanoddpm.py --epochs 5 --steps 500 --batch_size 128
+python nanoddpm.py --epochs 15 --steps 500 --batch_size 128
 ```
 
 ## Project Structure
