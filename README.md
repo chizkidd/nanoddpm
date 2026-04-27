@@ -33,7 +33,7 @@ This repository now explores three stages of diffusion modeling:
 ## Quick Start
 ```bash
 pip install -r requirements.txt
-python nanoddpm.py --epochs 15 --steps 500 --batch_size 128
+python nanoddpm.py --epochs 15 --steps 1000 --batch_size 128
 ```
 
 ## Project Structure
