@@ -70,17 +70,48 @@ class NanoDDPM(nn.Module):
     def __init__(self, time_dim=128):
         super().__init__()
         self.time_dim = time_dim
-        self.b1 = TimeBlock(1, 32, time_dim)
-        self.b2 = TimeBlock(32, 64, time_dim)
-        self.b3 = TimeBlock(64, 32, time_dim)
+
+        # Encoder
+        self.down1 = TimeBlock(1, 32, time_dim)                       # 28x28
+        self.pool1 = nn.Conv2d(32, 32, 4, stride=2, padding=1)        # 14x14
+        self.down2 = TimeBlock(32, 64, time_dim)                      # 14x14
+        self.pool2 = nn.Conv2d(64, 64, 4, stride=2, padding=1)        # 7x7
+        # Bottleneck
+        self.bottleneck = TimeBlock(64, 64, time_dim)
+        # Decoder
+        self.up2 = nn.ConvTranspose2d(64, 64, 4, stride=2, padding=1)  # 14x14
+        self.dec2 = TimeBlock(64 + 64, 32, time_dim)  # skip concat
+        self.up1 = nn.ConvTranspose2d(32, 32, 4, stride=2, padding=1)  # 28x28
+        self.dec1 = TimeBlock(32 + 32, 32, time_dim)  # skip concat
+        # Output
         self.out = nn.Conv2d(32, 1, 3, padding=1)
-        self.time_mlp = nn.Sequential(nn.Linear(time_dim, time_dim), nn.SiLU(), nn.Linear(time_dim, time_dim))
+        self.time_mlp = nn.Sequential(
+            nn.Linear(time_dim, time_dim),
+            nn.SiLU(),
+            nn.Linear(time_dim, time_dim),
+        )
+
     def forward(self, x, t):
         t_emb = self.time_mlp(sinusoidal_embedding(t, self.time_dim))
-        h1 = self.b1(x, t_emb)
-        h2 = self.b2(h1, t_emb)
-        h3 = self.b3(h2, t_emb)
-        return self.out(h3 + h1) 
+
+        # Encoder
+        s1 = self.down1(x, t_emb)        # [B, 32, 28, 28]
+        x = self.pool1(s1)               # [B, 32, 14, 14]
+        s2 = self.down2(x, t_emb)        # [B, 64, 14, 14]
+        x = self.pool2(s2)               # [B, 64, 7, 7]
+
+        # Bottleneck
+        x = self.bottleneck(x, t_emb)    # [B, 64, 7, 7]
+
+        # Decoder
+        x = self.up2(x)                  # [B, 64, 14, 14]
+        x = torch.cat([x, s2], dim=1)    # skip connection
+        x = self.dec2(x, t_emb)          # [B, 32, 14, 14]
+        x = self.up1(x)                  # [B, 32, 28, 28]
+        x = torch.cat([x, s1], dim=1)    # skip connection
+        x = self.dec1(x, t_emb)          # [B, 32, 28, 28]
+
+        return self.out(x)
 
 model = NanoDDPM(time_dim=128).to(device)
 optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
@@ -110,9 +141,10 @@ def intensity_kl(real, gen, bins=50):
 def evaluate(model, n=256, steps=250):
     model.eval()
     with torch.no_grad():
-        x = torch.randn(n, 1, 28, 28, device=device)                                  
-        t_seq = torch.linspace(T_steps - 1, 0, steps, device=device)
-        t_seq = torch.round(t_seq).long()                
+        x = torch.randn(n, 1, 28, 28, device=device)                                   
+        t_seq = torch.linspace(0, T_STEPS - 1, steps, device=device)
+        t_seq = torch.flip(t_seq, dims=[0]).long()
+        t_seq = torch.unique_consecutive(t_seq)              
         for i in range(len(t_seq) - 1):
             t = t_seq[i]
             t_next = t_seq[i + 1]
@@ -146,13 +178,11 @@ for epoch in trange(1, args.epochs+1, desc="Training"):
         t = torch.randint(0, T_steps, (imgs.shape[0],), device=device)
         xt, eps = forward_diffusion(imgs, t)
         optimizer.zero_grad()
-        # loss = nn.functional.mse_loss(model(xt, t), eps)
-        loss = ((model(xt, t) - eps) ** 2).mean(dim=(1,2,3))
-        loss = (loss * (1 - alpha_bar[t])).mean()
+        loss = nn.functional.mse_loss(model(xt, t), eps)
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
         optimizer.step()
-        update_ema(model, ema_model)
+        update_ema(model, ema_model, 0.999)
         epoch_loss += loss.item()*imgs.shape[0]
         count += imgs.shape[0]
     
