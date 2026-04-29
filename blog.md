@@ -5,7 +5,7 @@
 ## The Core Idea
 Diffusion models generate data by reversing a gradual noising process. Instead of learning to generate pixels directly, we train a network to **predict the noise added at each step**. Once trained, we start from pure Gaussian noise and iteratively denoise it into realistic samples.
 
-This post walks through the three pillars of DDPMs:
+This post walks through the three core pillars of DDPMs:
 1. Forward noising process (DDPM formulation)
 2. Reverse denoising process (sampling dynamics)
 3. Simplified noise-prediction loss
