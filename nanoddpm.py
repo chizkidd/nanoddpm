@@ -195,7 +195,7 @@ for metric_entry in metrics_log:
 
 with open('nanoddpm_metrics.json', 'w') as f: 
     json.dump(json_output_metrics, f, indent=2)
-print("Metrics saved to nanoddpm_metrics.json")
+print("Done. Metrics saved to nanoddpm_metrics.json")
 
 # === 7. VISUALIZATION ===
 def plot_results():
@@ -220,4 +220,3 @@ def plot_results():
     plt.show()
 
 plot_results()
-print("Done. Metrics saved to nanoddpm_metrics.json")
