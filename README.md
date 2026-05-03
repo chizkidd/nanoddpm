@@ -40,9 +40,9 @@ python nanoddpm.py --epochs 15 --steps 1000 --batch_size 128
 ```
 nanoddpm/
 ├── .github/workflows/ci.yml  # CI: CPU smoke test
-├── archive/                  # Legacy v1 implementations (preserved for reference)
-│   ├── nanoddpm-v1.ipynb
+├── archive/                  # Legacy older version .py & .ipynb implementations (preserved for reference)
 ├── nanoddpm.py               # Single-file diffusion implementation 
+├── nanoddpm.ipynb            # Colab notebook implementation 
 ├── requirements.txt          # torch, torchvision, numpy, matplotlib, tqdm
 ├── blog.md                   # Mathematical walkthrough (forward, reverse, loss, metrics)
 └── README.md
