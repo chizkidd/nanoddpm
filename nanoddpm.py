@@ -1,10 +1,10 @@
 # nanoddpm.py: From-scratch DDPM for MNIST (~260 lines)
 # Educational build inspired by micrograd/minbpe. 
-# Run: python nanoddpm.py [--epochs 3] [--batch_size 128] [--device cuda]
+# Run: python nanoddpm.py [--epochs 15] [--batch_size 128] [--device cuda]
 
-import argparse, torch, torch.nn as nn, torch.optim as optim
+import torch, torch.nn as nn, torch.optim as optim
 import torchvision, torchvision.transforms as T
-import matplotlib.pyplot as plt, numpy as np, math, json, copy
+import matplotlib.pyplot as plt, numpy as np, math, json, copy, argparse
 from tqdm import tqdm, trange
 import torch.nn.functional as F
 
@@ -22,8 +22,7 @@ print(f"▶ nanoddpm | Device: {device} | Steps: {args.steps} | Epochs: {args.ep
 
 # === 1. NOISE SCHEDULE & FORWARD PROCESS ===
 def cosine_beta_schedule(T, s=0.008):
-    steps = T + 1
-    x = torch.linspace(0, T, steps, device=device)
+    x = torch.linspace(0, T, T+1, device=device)
     alphas_bar = torch.cos(((x / T) + s) / (1 + s) * math.pi * 0.5) ** 2
     alphas_bar = alphas_bar / alphas_bar[0]
     beta = 1 - (alphas_bar[1:] / alphas_bar[:-1])
@@ -48,7 +47,7 @@ dataset = torchvision.datasets.MNIST(root="./data", train=True, download=True, t
 loader = torch.utils.data.DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=2, pin_memory=True)
 real_batch = next(iter(torch.utils.data.DataLoader(dataset, batch_size=256, shuffle=False)))[0].to(device)
 
-# === 3. MODEL (Sinusoidal Time Embedding + Time-Conditioned CNN) ===
+# === 3. MODEL (Sinusoidal Time Embedding + Minimal U-Net Style Diffusion Model) ===
 def sinusoidal_embedding(t, dim, max_period=10000):
     half = dim // 2
     freqs = torch.exp(-math.log(max_period) * torch.arange(half, dtype=torch.float32, device=t.device) / half)
@@ -70,7 +69,6 @@ class NanoDDPM(nn.Module):
     def __init__(self, time_dim=128):
         super().__init__()
         self.time_dim = time_dim
-
         # Encoder
         self.down1 = TimeBlock(1, 32, time_dim)                       # 28x28
         self.pool1 = nn.Conv2d(32, 32, 4, stride=2, padding=1)        # 14x14
@@ -85,24 +83,17 @@ class NanoDDPM(nn.Module):
         self.dec1 = TimeBlock(32 + 32, 32, time_dim)  # skip concat
         # Output
         self.out = nn.Conv2d(32, 1, 3, padding=1)
-        self.time_mlp = nn.Sequential(
-            nn.Linear(time_dim, time_dim),
-            nn.SiLU(),
-            nn.Linear(time_dim, time_dim),
-        )
+        self.time_mlp = nn.Sequential(nn.Linear(time_dim, time_dim), nn.SiLU(), nn.Linear(time_dim, time_dim), )
 
     def forward(self, x, t):
         t_emb = self.time_mlp(sinusoidal_embedding(t, self.time_dim))
-
         # Encoder
         s1 = self.down1(x, t_emb)        # [B, 32, 28, 28]
         x = self.pool1(s1)               # [B, 32, 14, 14]
         s2 = self.down2(x, t_emb)        # [B, 64, 14, 14]
         x = self.pool2(s2)               # [B, 64, 7, 7]
-
         # Bottleneck
         x = self.bottleneck(x, t_emb)    # [B, 64, 7, 7]
-
         # Decoder
         x = self.up2(x)                  # [B, 64, 14, 14]
         x = torch.cat([x, s2], dim=1)    # skip connection
@@ -110,7 +101,6 @@ class NanoDDPM(nn.Module):
         x = self.up1(x)                  # [B, 32, 28, 28]
         x = torch.cat([x, s1], dim=1)    # skip connection
         x = self.dec1(x, t_emb)          # [B, 32, 28, 28]
-
         return self.out(x)
 
 model = NanoDDPM(time_dim=128).to(device)
@@ -152,7 +142,8 @@ def evaluate(model, n=256, steps=250):
             eps = model(x, t_batch)
             ab, ab_next = alpha_bar[t], alpha_bar[t_next]
             x0 = (x - sqrt_one_minus_alpha_bar[t] * eps) / sqrt_alpha_bar[t]
-            x = sqrt_alpha_bar[t_next] * x0 + sqrt_one_minus_alpha_bar[t_next] * eps
+            eps_reconstructed = (x - sqrt_alpha_bar[t] * x0) / sqrt_one_minus_alpha_bar[t]
+            x = sqrt_alpha_bar[t_next] * x0 + sqrt_one_minus_alpha_bar[t_next] * eps_reconstructed
         x = torch.clamp(x, -1.0, 1.0)
         return {
             'fid': approx_fid(real_batch[:n], x),
@@ -196,7 +187,6 @@ for epoch in trange(1, args.epochs+1, desc="Training"):
     metrics_log.append(m)
     print(f"  Epoch {epoch:02d} | Loss: {m['loss']:.4f} | FID≈{m['fid']:.1f} | Var: {m['var']:.3f} | Grad: {m['grad']:.3f} | KL: {m['kl']:.4f}")
 
-
 # === 6. JSON DUMP: Create a serializable version of metrics_log for JSON dumping ===
 json_output_metrics = []
 for metric_entry in metrics_log:
@@ -205,6 +195,7 @@ for metric_entry in metrics_log:
 
 with open('nanoddpm_metrics.json', 'w') as f: 
     json.dump(json_output_metrics, f, indent=2)
+print("Metrics saved to nanoddpm_metrics.json")
 
 # === 7. VISUALIZATION ===
 def plot_results():
